@@ -8,12 +8,12 @@ const CARD_W = 5;
 const CARD_H = 7;
 const CARD_D = 0.15;
 
-const BASE_SCALE = 32;
+const BASE_SCALE = 36;
 const SLIDE_X = CARD_W * 0.5;
 const ease = (x) => (x <= 0 ? 0 : x >= 1 ? 1 : x * x * (3 - 2 * x));
 
 export function CardsMobile({ anchorRef: externalAnchorRef, zoomRef, navRef }) {
-  const COUNT = 19;
+  const COUNT = 20;
   const urls = useMemo(
     () => Array.from({ length: COUNT }, (_, i) => `/tarot/tarot${i + 1}.jpg`),
     [COUNT],

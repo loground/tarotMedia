@@ -13,7 +13,7 @@ export default function WebcamSky({ video }) {
     t.colorSpace = THREE.SRGBColorSpace;
     // front camera is mirrored — flip X so the sphere looks natural
     t.wrapS = THREE.RepeatWrapping;
-    t.repeat.x = -1;
+
     t.needsUpdate = true;
     textureRef.current = t;
     return t;
@@ -30,7 +30,7 @@ export default function WebcamSky({ video }) {
   if (!tex) return null;
 
   return (
-    <mesh scale={1}>
+    <mesh scale={0.8} position-y={-100} position-z={-200} rotation-y={Math.PI / 1.5}>
       <sphereGeometry args={[320, 80, 80]} />
       <meshBasicMaterial side={THREE.BackSide} map={tex} toneMapped={false} />
     </mesh>

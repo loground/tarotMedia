@@ -77,8 +77,8 @@ export const Background = () => {
   map.needsUpdate = true;
 
   return (
-    <mesh scale={1} rotation-y={Math.PI / 1.5}>
-      <sphereGeometry args={[320, 80, 80]} />
+    <mesh scale={1.3} position-z={-180} rotation-y={Math.PI / 1.5}>
+      <sphereGeometry args={[360, 80, 80]} />
       <meshBasicMaterial side={THREE.BackSide} map={map} toneMapped={false} />
     </mesh>
   );

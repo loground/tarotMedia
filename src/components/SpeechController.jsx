@@ -27,6 +27,7 @@ const CARD_PATTERNS = [
   { re: /\bmelted\b/i, idx: 15 },
   { re: /\bseacasa\b/i, idx: 16 },
   { re: /\bfilthy\b/i, idx: 17 },
+  { re: /\bsarto\b/i, idx: 19 },
 ];
 
 export default function SpeechController({ navRef, lang = 'en-US' }) {
