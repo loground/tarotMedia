@@ -43,28 +43,18 @@ export const Experience = ({ ...props }) => {
 
   return (
     <group {...props}>
-      {/* Controls no longer remount — limits updated dynamically */}
-
-      {/* LIGHTS */}
       <Environment preset="sunset" />
       <pointLight position={[12, 5, 12]} intensity={1.2} decay={0.8} distance={100} color="white" />
       <directionalLight position={[-15, 5, -15]} intensity={1.2} color="skyblue" />
 
       {video && <WebcamSky video={video} />}
 
-      {/* SCENES — instant switch during hold, covered by transition */}
-
       <CardsMobile anchorRef={cardsAnchorRef} zoomRef={zoomRef} navRef={navRef} />
       {video && <HandRotateController video={video} anchorRef={cardsAnchorRef} zoomRef={zoomRef} />}
 
       <SpeechController navRef={navRef} lang="en-EN" />
 
-      {/* Global background stays */}
       <Background />
-
-      {/* Transition overlay */}
-
-      {/* Switcher UI — centered, 20% from bottom */}
     </group>
   );
 };
