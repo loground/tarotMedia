@@ -1,56 +1,73 @@
 // components/HandRotateController.jsx
-// 'use client';
+// (no 'use client' needed for Vite; keep this as a regular client component)
 
 import { useEffect, useRef } from 'react';
-import { Hands, HAND_CONNECTIONS, Results } from '@mediapipe/hands';
 
 const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
 const lerp = (a, b, t) => a + (b - a) * t;
+
+// ESM dynamic import with optional CDN UMD fallback
+async function loadHandsCtor() {
+  try {
+    const mp = await import('@mediapipe/hands');
+    const ctor = mp?.Hands || mp?.default?.Hands;
+    if (typeof ctor === 'function') return ctor;
+  } catch (e) {
+    console.warn('ESM import of @mediapipe/hands failed, falling back to CDN UMD:', e);
+  }
+  // Fallback to UMD
+  await new Promise((res, rej) => {
+    const s = document.createElement('script');
+    s.src = 'https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1675469240/hands.js';
+    s.async = true;
+    s.onload = res;
+    s.onerror = rej;
+    document.head.appendChild(s);
+  });
+  return window.Hands || null;
+}
 
 export default function HandRotateController({
   video,
   anchorRef,
   zoomRef,
-  navRef, // ✅ NEW: to call next()/prev()
+  navRef,
 
   maxYaw = Math.PI * 0.35,
   maxPitch = 0.35,
   pinchRange = [0.15, 0.7],
   zoomRange = [0.5, 1.35],
 
-  // ✅ Swipe tuning (all normalized to [-1..1] X)
-  swipeWindowMs = 420, // lookback window to measure displacement
-  swipeDisplacement = 1, // how far across X in that window to count as swipe
-  swipeMinSpeed = 0.2, // |dx/dt| (units/sec) to reject slow drifts
-  swipeCooldownMs = 100, // debounce between swipes
-  swipeRequireOpenHand = true, // require open-ish hand (not pinched) to swipe
+  // swipe tuning (normalized X in [-1..1])
+  swipeWindowMs = 420,
+  swipeDisplacement = 0.35,
+  swipeMinSpeed = 1.0,
+  swipeCooldownMs = 700,
+  swipeRequireOpenHand = true,
 }) {
   const targetRot = useRef({ x: -0.09, y: 0 });
   const handsRef = useRef(null);
   const rafRef = useRef(0);
 
-  // ✅ swipe state
-  const xSmoothRef = useRef(0); // low-pass filtered hand center X [-1..1]
+  const xSmoothRef = useRef(0);
   const prevXRef = useRef(0);
   const prevTRef = useRef(0);
-  const samplesRef = useRef([]); // [{t, x}] within window
+  const samplesRef = useRef([]);
   const lastSwipeAt = useRef(0);
 
-  // init MediaPipe Hands via dynamic import (prod-safe)
   useEffect(() => {
     let cancelled = false;
 
     (async () => {
-      const mod = await import('@mediapipe/hands');
-      const HandsCtor = mod?.Hands || mod?.default?.Hands;
-      if (!HandsCtor) {
-        console.error('MediaPipe Hands constructor not found', mod);
-        console.log(HandsCtor, Hands);
+      const HandsCtor = await loadHandsCtor();
+      if (typeof HandsCtor !== 'function') {
+        console.error('MediaPipe Hands constructor not found');
         return;
       }
 
-      const hands = new Hands({
-        locateFile: (f) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}`,
+      // IMPORTANT: instantiate the resolved constructor, not a top-level import
+      const hands = new HandsCtor({
+        locateFile: (f) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1675469240/${f}`,
       });
 
       hands.setOptions({
@@ -63,32 +80,25 @@ export default function HandRotateController({
       const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
 
       const trySwipe = (now, xSmooth, pinchRatio) => {
-        // Keep window to ~swipeWindowMs
         const arr = samplesRef.current;
         arr.push({ t: now, x: xSmooth });
         const cutoff = now - swipeWindowMs;
         while (arr.length && arr[0].t < cutoff) arr.shift();
-
         if (arr.length < 2) return;
 
-        const dx = xSmooth - arr[0].x; // displacement over window
+        const dx = xSmooth - arr[0].x;
         const dt = Math.max(1e-3, (now - (prevTRef.current || now)) / 1000);
-        const instSpeed = Math.abs((xSmooth - prevXRef.current) / dt); // units/sec
+        const instSpeed = Math.abs((xSmooth - prevXRef.current) / dt);
+        const openEnough = !swipeRequireOpenHand || pinchRatio > 0.38;
 
-        const openEnough = !swipeRequireOpenHand || pinchRatio > 0.38; // tweak
-
-        // Cooldown
         if (now - lastSwipeAt.current < swipeCooldownMs) return;
 
         if (openEnough && instSpeed >= swipeMinSpeed) {
           if (dx >= swipeDisplacement) {
-            // left -> right swipe → NEXT
             navRef?.current?.next?.();
             lastSwipeAt.current = now;
-            // reset window to avoid double-fire on same motion
             samplesRef.current = [];
           } else if (dx <= -swipeDisplacement) {
-            // right -> left swipe → PREV
             navRef?.current?.prev?.();
             lastSwipeAt.current = now;
             samplesRef.current = [];
@@ -103,7 +113,6 @@ export default function HandRotateController({
         const lm = results.multiHandLandmarks?.[0];
 
         if (lm) {
-          // center (average of landmarks)
           let cx = 0,
             cy = 0;
           for (let i = 0; i < lm.length; i++) {
@@ -113,39 +122,29 @@ export default function HandRotateController({
           cx /= lm.length;
           cy /= lm.length;
 
-          // normalized to [-1..1]
           const nx = clamp((0.5 - cx) * 2, -1, 1);
           const ny = clamp((cy - 0.5) * 2, -1, 1);
 
-          // rotation target
           const yaw = nx * maxYaw;
           const pitch = ny * maxPitch;
           targetRot.current.y = lerp(targetRot.current.y, yaw, 0.25);
           targetRot.current.x = lerp(targetRot.current.x, pitch, 0.25);
 
-          // zoom via pinch ratio
           const pinch = dist(lm[4], lm[8]);
           const palm = dist(lm[5], lm[17]) + 1e-6;
           const pinchRatio = clamp(pinch / palm, pinchRange[0], pinchRange[1]);
 
           if (zoomRef) {
             const t = (pinchRatio - pinchRange[0]) / (pinchRange[1] - pinchRange[0]);
-            const zTarget =
-              zoomRange[0] + t * (zoomRange[1] - zoomRange[1] + 0 || zoomRange[1] - zoomRange[0]);
-            const next = lerp(
-              zoomRef.current ?? 1,
-              zoomRange[0] + t * (zoomRange[1] - zoomRange[0]),
-              0.2,
-            );
+            const zTarget = zoomRange[0] + t * (zoomRange[1] - zoomRange[0]);
+            const next = lerp(zoomRef.current ?? 1, zTarget, 0.2);
             zoomRef.current = clamp(next, zoomRange[0], zoomRange[1]);
           }
 
-          // ✅ swipe detection (low-pass + windowed displacement + speed + cooldown)
           const now = performance.now();
-          xSmoothRef.current = lerp(xSmoothRef.current, nx, 0.35); // low-pass
+          xSmoothRef.current = lerp(xSmoothRef.current, nx, 0.35);
           trySwipe(now, xSmoothRef.current, pinchRatio);
         } else {
-          // relax back to idle pose when no hand
           targetRot.current.y = lerp(targetRot.current.y, 0, 0.08);
           targetRot.current.x = lerp(targetRot.current.x, -0.09, 0.08);
           samplesRef.current = [];
@@ -177,7 +176,6 @@ export default function HandRotateController({
     swipeRequireOpenHand,
   ]);
 
-  // feed frames to MediaPipe
   useEffect(() => {
     if (!video) return;
     let running = true;
@@ -202,7 +200,6 @@ export default function HandRotateController({
     };
   }, [video]);
 
-  // apply rotation to anchor
   useEffect(() => {
     let raf;
     const tick = () => {
