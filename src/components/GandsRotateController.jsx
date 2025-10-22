@@ -41,28 +41,16 @@ export default function HandRotateController({
     let cancelled = false;
 
     (async () => {
-      let mp;
-      try {
-        // ESM-safe dynamic import; works in Next prod
-        mp = await import('@mediapipe/hands');
-      } catch (e) {
-        console.error('Failed to import @mediapipe/hands:', e);
+      const mod = await import('@mediapipe/hands');
+      const HandsCtor = mod?.Hands || mod?.default?.Hands;
+      if (!HandsCtor) {
+        console.error('MediaPipe Hands constructor not found', mod);
+        console.log(HandsCtor, Hands);
         return;
       }
 
-      // The package exports a namespace; Hands is a property on it
-      const HandsCtor =
-        mp?.Hands ||
-        mp?.default?.Hands || // some bundlers wrap under default
-        null;
-
-      if (typeof HandsCtor !== 'function') {
-        console.error('MediaPipe Hands constructor not found', mp);
-        return;
-      }
-
-      const hands = new HandsCtor({
-        locateFile: (f) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1675469240/${f}`,
+      const hands = new Hands({
+        locateFile: (f) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}`,
       });
 
       hands.setOptions({
