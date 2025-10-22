@@ -2,6 +2,7 @@
 // 'use client';
 
 import { useEffect, useRef } from 'react';
+import { Hands, HAND_CONNECTIONS, Results } from '@mediapipe/hands';
 
 const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
 const lerp = (a, b, t) => a + (b - a) * t;
@@ -47,7 +48,7 @@ export default function HandRotateController({
         return;
       }
 
-      const hands = new HandsCtor({
+      const hands = new Hands({
         locateFile: (f) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1675469240/${f}`,
       });
 

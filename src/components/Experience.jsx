@@ -1,24 +1,17 @@
 // Experience.jsx
-import {
-  Environment,
-  useTexture,
-  OrbitControls,
-  Html,
-  Hud,
-  OrthographicCamera,
-  shaderMaterial,
-} from '@react-three/drei';
+import { Environment, useTexture } from '@react-three/drei';
 import * as THREE from 'three';
 import { MeshDepthMaterial } from 'three';
-import { degToRad, MathUtils } from 'three/src/math/MathUtils.js';
-import { extend, useFrame, useThree } from '@react-three/fiber';
-import { useEffect, useMemo, useState, useRef } from 'react';
+
+import { useThree } from '@react-three/fiber';
+import { useRef } from 'react';
 
 import { CardsMobile } from './Cardsmobile';
 import WebcamSky from './WebcamBg';
 import HandRotateController from './GandsRotateController';
 import useWebcam from '../components/hooks/useWebcam';
 import SpeechController from '../components/SpeechController';
+import { Hands, HAND_CONNECTIONS, Results } from '@mediapipe/hands';
 
 const depthMaterial = new MeshDepthMaterial();
 depthMaterial.depthPacking = THREE.RGBADepthPacking;
