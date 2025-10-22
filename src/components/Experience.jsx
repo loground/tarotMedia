@@ -50,7 +50,14 @@ export const Experience = ({ ...props }) => {
       {video && <WebcamSky video={video} />}
 
       <CardsMobile anchorRef={cardsAnchorRef} zoomRef={zoomRef} navRef={navRef} />
-      {video && <HandRotateController video={video} anchorRef={cardsAnchorRef} zoomRef={zoomRef} />}
+      {video && (
+        <HandRotateController
+          video={video}
+          anchorRef={cardsAnchorRef}
+          zoomRef={zoomRef}
+          navRef={navRef}
+        />
+      )}
 
       <SpeechController navRef={navRef} lang="en-EN" />
 
