@@ -39,11 +39,11 @@ export default function HandRotateController({
   zoomRange = [0.5, 1.35],
 
   // swipe tuning (normalized X in [-1..1])
-  swipeWindowMs = 420,
+  swipeWindowMs = 100,
   swipeDisplacement = 0.35,
   swipeMinSpeed = 1.0,
   swipeCooldownMs = 700,
-  swipeRequireOpenHand = true,
+  swipeRequireOpenHand = false,
 }) {
   const targetRot = useRef({ x: -0.09, y: 0 });
   const handsRef = useRef(null);
@@ -91,19 +91,19 @@ export default function HandRotateController({
         const instSpeed = Math.abs((xSmooth - prevXRef.current) / dt);
         const openEnough = !swipeRequireOpenHand || pinchRatio > 0.38;
 
-        if (now - lastSwipeAt.current < swipeCooldownMs) return;
+        // if (now - lastSwipeAt.current < swipeCooldownMs) return;
 
-        if (openEnough && instSpeed >= swipeMinSpeed) {
-          if (dx >= swipeDisplacement) {
-            navRef?.current?.next?.();
-            lastSwipeAt.current = now;
-            samplesRef.current = [];
-          } else if (dx <= -swipeDisplacement) {
-            navRef?.current?.prev?.();
-            lastSwipeAt.current = now;
-            samplesRef.current = [];
-          }
-        }
+        // if (openEnough && instSpeed >= swipeMinSpeed) {
+        //   if (dx >= swipeDisplacement) {
+        //     navRef?.current?.next?.();
+        //     lastSwipeAt.current = now;
+        //     samplesRef.current = [];
+        //   } else if (dx <= -swipeDisplacement) {
+        //     navRef?.current?.prev?.();
+        //     lastSwipeAt.current = now;
+        //     samplesRef.current = [];
+        //   }
+        // }
 
         prevXRef.current = xSmooth;
         prevTRef.current = now;

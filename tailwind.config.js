@@ -4,8 +4,8 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        sp: [
-          '"SpFont"',
+        de: [
+          '"De"',
           'ui-sans-serif',
           'system-ui',
           '-apple-system',
@@ -15,7 +15,7 @@ export default {
           'Arial',
         ],
         // if you prefer monospace fallback for the button:
-        spmono: ['"SpFont"', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'monospace'],
+        spmono: ['"De"', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'monospace'],
       },
     },
   },

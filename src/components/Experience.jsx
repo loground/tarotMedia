@@ -11,7 +11,6 @@ import WebcamSky from './WebcamBg';
 import HandRotateController from './GandsRotateController';
 import useWebcam from '../components/hooks/useWebcam';
 import SpeechController from '../components/SpeechController';
-import { Hands, HAND_CONNECTIONS, Results } from '@mediapipe/hands';
 
 const depthMaterial = new MeshDepthMaterial();
 depthMaterial.depthPacking = THREE.RGBADepthPacking;

@@ -296,7 +296,7 @@ export default function SpeechController({ navRef, lang = 'en-US' }) {
   return (
     <Html fullscreen>
       <div className="pointer-events-none fixed bottom-44 inset-x-0 flex justify-center z-[9999]">
-        <div className="min-w-[20vw] max-w-[20vw] rounded-2xl bg-black/70 backdrop-blur px-4 py-3 text-white text-sm shadow-lg">
+        <div className="min-w-[20vw] max-w-[20vw] font-bold rounded-2xl bg-black/70 backdrop-blur px-4 py-3 text-white text-sm shadow-lg">
           <div>{finalText || "Say a card name, 'open link', or 'next' / 'back'…"}</div>
           {interimText && <div className="mt-1 text-xs opacity-70">{interimText}</div>}
         </div>

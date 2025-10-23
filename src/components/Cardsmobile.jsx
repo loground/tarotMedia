@@ -8,7 +8,7 @@ const CARD_W = 5;
 const CARD_H = 7;
 const CARD_D = 0.15;
 
-const BASE_SCALE = 40;
+const BASE_SCALE = 35;
 const SLIDE_X = CARD_W * 0.5;
 const ease = (x) => (x <= 0 ? 0 : x >= 1 ? 1 : x * x * (3 - 2 * x));
 
