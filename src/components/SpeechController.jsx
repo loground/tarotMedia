@@ -36,6 +36,8 @@ const CARD_TITLES = [
   'filthy',
   'johnny cash',
   'sarto',
+  'souljak',
+  'god',
 ];
 
 // Primary literal patterns (specific → general)
@@ -60,6 +62,8 @@ const CARD_PATTERNS = [
   { re: /\bseacasa\b/i, idx: 16 },
   { re: /\bfilthy\b/i, idx: 17 },
   { re: /\bsarto\b/i, idx: 19 },
+  { re: /\bsouljak\b/i, idx: 20 },
+  { re: /\bgod\b/i, idx: 21 },
 ];
 
 // Known ASR aliases/mis-hearings (extend freely)
@@ -154,6 +158,8 @@ const CARD_LINKS = [
   'https://www.filthytrikks.com',
   'https://x.com/JohnnyCash4243/status/1980274566472814726',
   'https://vibechain.com/market/historyofcomputer?ref=0HTIY11FVZDZ',
+  'https://www.souljak.wtf/',
+  'https://x.com/cryptojcdenton/status/1976835381904781649',
 ];
 
 // ----------------------------------
@@ -165,6 +171,7 @@ export default function SpeechController({ navRef, lang = 'en-US' }) {
   const keepAlive = useRef(true);
   const lastTriggerAt = useRef(0);
   const lastShownIdx = useRef(null); // best-effort fallback
+  const [showNames, setShowNames] = useState(false);
 
   function triggerOnce(cb) {
     const now = performance.now();
@@ -294,8 +301,74 @@ export default function SpeechController({ navRef, lang = 'en-US' }) {
   }, [lang]);
 
   return (
-    <Html fullscreen>
-      <div className="pointer-events-none fixed bottom-44 inset-x-0 flex justify-center z-[9999]">
+    <Html>
+      {/* Top-left: Commands panel */}
+      <div className="fixed bottom-40 right-80 z-[9999] pointer-events-auto">
+        <div className="w-[280px] rounded-2xl bg-black/70 backdrop-blur shadow-lg ring-1 ring-white/10 text-white">
+          <div className="px-4 pt-3 pb-2">
+            <div className="text-[20px] uppercase tracking-wide  font-de">Voice commands</div>
+
+            <div className="mt-2 space-y-2 text-sm">
+              {/* Say a card name */}
+              <div className="leading-snug">
+                <span className="opacity-80">Say a card name</span>{' '}
+                <button
+                  type="button"
+                  className="align-middle rounded-md px-2 py-1 text-[11px] font-semibold bg-white/10 hover:bg-white/20 active:bg-white/25 transition"
+                  onClick={() => setShowNames((s) => !s)}>
+                  Names
+                  <span
+                    className="ml-1 inline-block rotate-0 transition-transform"
+                    style={{ transform: showNames ? 'rotate(180deg)' : 'rotate(0deg)' }}>
+                    ▾
+                  </span>
+                </button>
+              </div>
+
+              {/* Next / Back */}
+              <div className="leading-snug">
+                <kbd className="rounded-md bg-white/10 px-1.5 py-0.5 text-[11px]">next</kbd>
+                <span className="mx-1 opacity-60">/</span>
+                <kbd className="rounded-md bg-white/10 px-1.5 py-0.5 text-[11px]">back</kbd>
+                <span className="ml-2 opacity-80">to navigate</span>
+              </div>
+
+              {/* Open link */}
+              <div className="leading-snug">
+                <kbd className="rounded-md bg-white/10 px-1.5 py-0.5 text-[11px]">open link</kbd>
+                <span className="ml-2 opacity-80">to open the card’s link</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Collapsible names list */}
+          {showNames && (
+            <div className="px-3 pb-3">
+              <div className="max-h-44 overflow-auto rounded-xl bg-white/5 p-2 grid grid-cols-2 gap-1.5">
+                {CARD_TITLES.map((name, i) => (
+                  <button
+                    key={name}
+                    type="button"
+                    className="truncate text-left text-[12px] px-2 py-1 rounded-lg bg-white/10 hover:bg-white/20 active:bg-white/25 transition"
+                    onClick={() => {
+                      // jump to the card when clicked
+                      try {
+                        navRef?.current?.showByIndex?.(i);
+                      } catch {}
+                      setShowNames(false);
+                    }}
+                    title={name}>
+                    {name}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Bottom center: transcript (unchanged position) */}
+      <div className="pointer-events-none fixed bottom-44 inset-x-0 flex justify-center z-[9998]">
         <div className="min-w-[20vw] max-w-[20vw] font-bold rounded-2xl bg-black/70 backdrop-blur px-4 py-3 text-white text-sm shadow-lg">
           <div>{finalText || "Say a card name, 'open link', or 'next' / 'back'…"}</div>
           {interimText && <div className="mt-1 text-xs opacity-70">{interimText}</div>}
