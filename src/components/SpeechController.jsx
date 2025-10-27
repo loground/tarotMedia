@@ -2,19 +2,25 @@
 import { useEffect, useRef, useState } from 'react';
 import { Html } from '@react-three/drei';
 
-// next/back
+/** ---------------- Voice patterns ---------------- */
 const NEXT_PATTERNS = [/\bnext\b/i, /\bforward\b/i, /след(ующая|ующий)/i, /далее/i];
 const BACK_PATTERNS = [/\bback\b/i, /\bprevious\b/i, /назад/i, /предыдущ(ая|ий)/i];
-
-// ✅ NEW: "open link" voice triggers (EN + RU)
+const FUTURE_PATTERNS = [
+  /\bwhat'?s\s+my\s+future\b/i,
+  /\bmy\s+future\b/i,
+  /каков[а-я\s]*\s+моя\s+судьба/i,
+  /что\s+(со|c)\s+мо(ей|ей)\s+судьб[оа]й/i,
+];
 const OPEN_LINK_PATTERNS = [
   /\bopen\s+(the\s+)?link\b/i,
   /\bopen\s+link\b/i,
-  /откр(ой|ыть)\s*ссылк[уае]?/i, // "открой ссылку/открыть ссылку"
+  /откр(ой|ыть)\s*ссылк[уае]?/i,
   /\bссылк[ауе]?\s*откр(ой|ыть)?\b/i,
 ];
 
-// Canonical names by index — keep in sync with deck order
+/** ---------------- Card names (22) ----------------
+ * Keep order in sync with your deck.
+ */
 const CARD_TITLES = [
   'deployer',
   'nico',
@@ -40,7 +46,34 @@ const CARD_TITLES = [
   'god',
 ];
 
-// Primary literal patterns (specific → general)
+// Per-card destination links (edit as you wish)
+const DEFAULT_LINK = 'https://x.com';
+const CARD_LINKS = [
+  'https://x.com/0xDeployer',
+  'https://vibechain.com/market',
+  'https://www.youtube.com/watch?v=pKN9trFSACI',
+  'https://vibechain.com/market/tarot',
+  'https://jesse.xyz',
+  'https://x.com/Stonks_OG',
+  'https://bankr.bot',
+  'https://junglebayisland.com',
+  'https://opensea.io/token/base/0x3ec2156d4c0a9cbdab4a016633b7bcf6a8d68ea2',
+  'https://farcaster.xyz/birtcorn',
+  'https://x.com/DickbuttCTO',
+  'https://opensea.io/collection/mfers',
+  'https://farcaster.xyz/baseapp.base.eth',
+  'https://farcaster.xyz/filmatree',
+  'https://www.inkmfer.com',
+  'https://linktr.ee/meltedmindz',
+  'https://x.com/_seacasa',
+  'https://www.filthytrikks.com',
+  'https://x.com/JohnnyCash4243/status/1980274566472814726',
+  'https://vibechain.com/market/historyofcomputer?ref=0HTIY11FVZDZ',
+  'https://www.souljak.wtf/',
+  'https://x.com/cryptojcdenton/status/1976835381904781649',
+];
+
+// Strong patterns + alias fallbacks for noisy ASR
 const CARD_PATTERNS = [
   { re: /\bjohnny\s+cash\b/i, idx: 18 },
   { re: /\bjungle\s*bay\b/i, idx: 7 },
@@ -66,7 +99,6 @@ const CARD_PATTERNS = [
   { re: /\bgod\b/i, idx: 21 },
 ];
 
-// Known ASR aliases/mis-hearings (extend freely)
 const CARD_ALIASES = {
   16: [
     /\bsea\s*casa\b/i,
@@ -74,16 +106,15 @@ const CARD_ALIASES = {
     /\bsi\s*casa\b/i,
     /\bsu\s*casa\b/i,
     /\bse[ae]\s*cassa\b/i,
-    /\bseacaza\b/i,
-  ], // seacasa
-  18: [/\bjohnny\s*kash\b/i, /\bjohnny\s*cache\b/i, /\bjoh?n?y\s*cash\b/i], // johnny cash
-  7: [/\bjungle\s*bae?\b/i, /\bjangle\s*bay\b/i, /\bjungle\s*day\b/i], // jungle bay
-  10: [/\bdick\s*but+\b/i, /\bdic+k?b(u|a)t+\b/i], // dickbutt
-  11: [/\bem\s*fair\b/i, /\bem\s*fer\b/i, /\bma?fer\b/i], // mfer
-  5: [/\bstocks?\b/i, /\bstonx\b/i], // stonks
+  ],
+  18: [/\bjohnny\s*kash\b/i, /\bjohnny\s*cache\b/i, /\bjoh?n?y\s*cash\b/i],
+  7: [/\bjungle\s*bae?\b/i, /\bjangle\s*bay\b/i, /\bjungle\s*day\b/i],
+  10: [/\bdic+k?b(u|a)t+\b/i, /\bdick\s*but+\b/i],
+  11: [/\bem\s*fair\b/i, /\bem\s*fer\b/i, /\bma?fer\b/i],
+  5: [/\bstocks?\b/i, /\bstonx\b/i],
 };
 
-// ---- helpers (same as before) ----
+/** ---------------- Fuzzy helpers ---------------- */
 const norm = (s) =>
   s
     .toLowerCase()
@@ -115,128 +146,112 @@ function lev(a, b) {
   return dp[n];
 }
 
-function fuzzyFindIndex(utterance) {
-  const u = norm(utterance);
-  if (!u) return null;
-  let bestIdx = null,
-    bestScore = Infinity;
+function tryCardIndexFromUtterance(utterance) {
+  const text = utterance.toLowerCase();
 
-  for (let idx = 0; idx < CARD_TITLES.length; idx++) {
-    const t = norm(CARD_TITLES[idx]);
-    const d = Math.min(lev(u, t), lev(u.replace(/\s+/g, ''), t.replace(/\s+/g, '')));
-    if (d < bestScore) {
-      bestScore = d;
-      bestIdx = idx;
-    }
-    if (d <= 1) return idx; // early perfect/near-perfect
+  // 1) direct patterns
+  for (const { re, idx } of CARD_PATTERNS) {
+    if (re.test(text)) return idx;
   }
-  const tBest = norm(CARD_TITLES[bestIdx]);
+  for (const [idxStr, list] of Object.entries(CARD_ALIASES)) {
+    const idx = Number(idxStr);
+    for (const re of list) if (re.test(text)) return idx;
+  }
+
+  // 2) fuzzy
+  const u = norm(utterance);
+  let bestIdx = null,
+    best = Infinity;
+  for (let i = 0; i < CARD_TITLES.length; i++) {
+    const t = norm(CARD_TITLES[i]);
+    const d = Math.min(lev(u, t), lev(u.replace(/\s+/g, ''), t.replace(/\s+/g, '')));
+    if (d < best) {
+      best = d;
+      bestIdx = i;
+    }
+    if (d <= 1) return i;
+  }
+  const tBest = norm(CARD_TITLES[bestIdx ?? 0] || '');
   const tol = Math.min(3, Math.max(1, Math.floor(Math.max(tBest.length, 3) * 0.3)));
-  return bestScore <= tol ? bestIdx : null;
+  return best <= tol ? bestIdx : null;
 }
 
-// ✅ NEW: per-card links (replace per index as needed)
-const DEFAULT_LINK = 'https://x.com'; // <- replace later
-const CARD_LINKS = [
-  'https://x.com/0xDeployer', // 0 deployer
-  'https://vibechain.com/market', // 1 nico
-  'https://www.youtube.com/watch?v=pKN9trFSACI', // 2 jc
-  'https://vibechain.com/market/tarot',
-  'https://jesse.xyz',
-  'https://x.com/Stonks_OG',
-  'https://bankr.bot',
-  'https://junglebayisland.com',
-  'https://opensea.io/token/base/0x3ec2156d4c0a9cbdab4a016633b7bcf6a8d68ea2',
-  'https://farcaster.xyz/birtcorn',
-  'https://x.com/DickbuttCTO',
-  'https://opensea.io/collection/mfers',
-  'https://farcaster.xyz/baseapp.base.eth',
-  'https://farcaster.xyz/filmatree',
-  'https://www.inkmfer.com',
-  'https://linktr.ee/meltedmindz',
-  'https://x.com/_seacasa',
-  'https://www.filthytrikks.com',
-  'https://x.com/JohnnyCash4243/status/1980274566472814726',
-  'https://vibechain.com/market/historyofcomputer?ref=0HTIY11FVZDZ',
-  'https://www.souljak.wtf/',
-  'https://x.com/cryptojcdenton/status/1976835381904781649',
-];
-
-// ----------------------------------
-
-export default function SpeechController({ navRef, lang = 'en-US' }) {
+/** ---------------- Component ---------------- */
+export default function SpeechController({ navRef, lang = 'en-US', onAskFuture, showDeck }) {
   const [finalText, setFinalText] = useState('');
   const [interimText, setInterimText] = useState('');
+  const [showNames, setShowNames] = useState(false);
+
   const recogRef = useRef(null);
   const keepAlive = useRef(true);
   const lastTriggerAt = useRef(0);
-  const lastShownIdx = useRef(null); // best-effort fallback
-  const [showNames, setShowNames] = useState(false);
+  const lastResultAt = useRef(performance.now());
+  const watchdogRef = useRef(0);
 
-  function triggerOnce(cb) {
+  // best-effort: what's currently shown (if navRef doesn't expose a getter)
+  const lastShownIdx = useRef(null);
+
+  const triggerOnce = (cb) => {
     const now = performance.now();
     if (now - lastTriggerAt.current < 450) return false;
     lastTriggerAt.current = now;
     cb?.();
     return true;
-  }
+  };
 
-  function tryCardAliases(text) {
-    for (const { re, idx } of CARD_PATTERNS) if (re.test(text)) return idx;
-    for (const [idxStr, list] of Object.entries(CARD_ALIASES)) {
-      const idx = Number(idxStr);
-      for (const re of list) if (re.test(text)) return idx;
-    }
-    return fuzzyFindIndex(text);
-  }
-
-  // ✅ Try to get current active index from navRef, else use our last known
-  function getCurrentIndex() {
+  const getActiveIndex = () => {
     const nav = navRef?.current;
     if (!nav) return lastShownIdx.current;
     if (typeof nav.getActiveIndex === 'function') return nav.getActiveIndex();
     if (typeof nav.getIndex === 'function') return nav.getIndex();
     if (typeof nav.activeIndex === 'number') return nav.activeIndex;
     return lastShownIdx.current;
-  }
+  };
 
-  // ✅ Open the link for a given card index (new tab if allowed; else same tab)
-  function openCardLink(idx) {
+  const openCardLink = (idx) => {
     if (!Number.isInteger(idx) || idx < 0 || idx >= CARD_LINKS.length) return;
     const url = CARD_LINKS[idx] || DEFAULT_LINK;
-    window.open(url, '_blank');
-  }
+    try {
+      window.open(url, '_blank');
+    } catch {
+      window.location.href = url;
+    }
+  };
 
   function checkCommands(textRaw) {
+    lastResultAt.current = performance.now();
     const text = textRaw.toLowerCase();
 
-    // ✅ 1) "open link" command (optionally with a card name)
+    // 0) future sequence
+    if (FUTURE_PATTERNS.some((p) => p.test(text))) {
+      triggerOnce(() => onAskFuture?.());
+      return;
+    }
+
+    // 1) open link (optionally with card name)
     if (OPEN_LINK_PATTERNS.some((p) => p.test(text))) {
-      // If the utterance contains a recognizable card name, use that;
-      // otherwise, use the current card from navRef/lastShown.
-      let idx = tryCardAliases(text);
-      if (!Number.isInteger(idx)) idx = getCurrentIndex();
+      let idx = tryCardIndexFromUtterance(text);
+      if (!Number.isInteger(idx)) idx = getActiveIndex();
       if (Number.isInteger(idx)) triggerOnce(() => openCardLink(idx));
       return;
     }
 
-    // 2) Card names (aliases/fuzzy)
-    const cardIdx = tryCardAliases(text);
+    // 2) card names (aliases/fuzzy)
+    const cardIdx = tryCardIndexFromUtterance(text);
     if (Number.isInteger(cardIdx)) {
       triggerOnce(() => {
         navRef?.current?.showByIndex?.(cardIdx);
-        lastShownIdx.current = cardIdx; // keep in sync
+        lastShownIdx.current = cardIdx;
       });
       return;
     }
 
-    // 3) Next / Back
+    // 3) next/back
     if (NEXT_PATTERNS.some((p) => p.test(text))) {
       triggerOnce(() => {
         navRef?.current?.next?.();
-        // Try to update lastShown after nav moves (best-effort)
         requestAnimationFrame(() => {
-          const now = getCurrentIndex();
+          const now = getActiveIndex();
           if (Number.isInteger(now)) lastShownIdx.current = now;
         });
       });
@@ -246,7 +261,7 @@ export default function SpeechController({ navRef, lang = 'en-US' }) {
       triggerOnce(() => {
         navRef?.current?.prev?.();
         requestAnimationFrame(() => {
-          const now = getCurrentIndex();
+          const now = getActiveIndex();
           if (Number.isInteger(now)) lastShownIdx.current = now;
         });
       });
@@ -254,6 +269,7 @@ export default function SpeechController({ navRef, lang = 'en-US' }) {
     }
   }
 
+  /** ----- SpeechRecognition lifecycle (robust keepalive) ----- */
   useEffect(() => {
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SR) return;
@@ -277,7 +293,23 @@ export default function SpeechController({ navRef, lang = 'en-US' }) {
           interim += text + ' ';
         }
       }
-      if (interim) setInterimText(interim.trim());
+      if (interim) {
+        setInterimText(interim.trim());
+        lastResultAt.current = performance.now();
+      }
+    };
+
+    rec.onerror = () => {
+      try {
+        rec.stop();
+      } catch {}
+      setTimeout(() => {
+        if (keepAlive.current) {
+          try {
+            rec.start();
+          } catch {}
+        }
+      }, 300);
     };
 
     rec.onend = () => {
@@ -292,56 +324,79 @@ export default function SpeechController({ navRef, lang = 'en-US' }) {
       rec.start();
     } catch {}
 
+    // watchdog: restart if idle for a while
+    watchdogRef.current = window.setInterval(() => {
+      const idleMs = performance.now() - lastResultAt.current;
+      if (idleMs > 7000 && keepAlive.current) {
+        try {
+          rec.stop();
+        } catch {}
+        setTimeout(() => {
+          try {
+            rec.start();
+          } catch {}
+        }, 200);
+      }
+    }, 2000);
+
     return () => {
       keepAlive.current = false;
+      window.clearInterval(watchdogRef.current);
       try {
         rec.stop();
       } catch {}
     };
   }, [lang]);
 
+  /** ---------------- UI ---------------- */
   return (
     <Html>
-      {/* Top-left: Commands panel */}
-      <div className="fixed bottom-40 right-80 z-[9999] pointer-events-auto">
+      {/* Panel (bottom-right): voice commands + names dropdown */}
+      <div className="fixed bottom-28 right-80 z-[9999] pointer-events-auto">
         <div className="w-[280px] rounded-2xl bg-black/70 backdrop-blur shadow-lg ring-1 ring-white/10 text-white">
           <div className="px-4 pt-3 pb-2">
-            <div className="text-[20px] uppercase tracking-wide  font-de">Voice commands</div>
+            <div className="text-[20px] uppercase tracking-wide font-de">Voice</div>
 
             <div className="mt-2 space-y-2 text-sm">
-              {/* Say a card name */}
               <div className="leading-snug">
-                <span className="opacity-80">Say a card name</span>{' '}
-                <button
-                  type="button"
-                  className="align-middle rounded-md px-2 py-1 text-[11px] font-semibold bg-white/10 hover:bg-white/20 active:bg-white/25 transition"
-                  onClick={() => setShowNames((s) => !s)}>
-                  Names
-                  <span
-                    className="ml-1 inline-block rotate-0 transition-transform"
-                    style={{ transform: showNames ? 'rotate(180deg)' : 'rotate(0deg)' }}>
-                    ▾
-                  </span>
-                </button>
+                <span className="opacity-80">Find your future (once) by saying</span>{' '}
+                <kbd className="rounded bg-white/10 px-1.5 py-0.5 text-[11px]">
+                  what’s my future
+                </kbd>
               </div>
 
-              {/* Next / Back */}
               <div className="leading-snug">
-                <kbd className="rounded-md bg-white/10 px-1.5 py-0.5 text-[11px]">next</kbd>
+                <span className="opacity-80">say</span>{' '}
+                <kbd className="rounded bg-white/10 px-1.5 py-0.5 text-[11px]">next</kbd>
                 <span className="mx-1 opacity-60">/</span>
-                <kbd className="rounded-md bg-white/10 px-1.5 py-0.5 text-[11px]">back</kbd>
+                <kbd className="rounded bg-white/10 px-1.5 py-0.5 text-[11px]">back</kbd>
                 <span className="ml-2 opacity-80">to navigate</span>
               </div>
 
-              {/* Open link */}
               <div className="leading-snug">
-                <kbd className="rounded-md bg-white/10 px-1.5 py-0.5 text-[11px]">open link</kbd>
-                <span className="ml-2 opacity-80">to open the card’s link</span>
+                <kbd className="rounded bg-white/10 px-1.5 py-0.5 text-[11px]">open link</kbd>
+                <span className="ml-2 opacity-80">to open card's website </span>
               </div>
+
+              {showDeck && (
+                <div className="leading-snug">
+                  <span className="opacity-80">Select or pronounce a card name from the list</span>{' '}
+                  <button
+                    type="button"
+                    className="align-middle rounded-md px-2 py-1 text-[11px] font-semibold bg-white/10 hover:bg-white/20 active:bg-white/25 transition"
+                    onClick={() => setShowNames((s) => !s)}>
+                    Names
+                    <span
+                      className="ml-1 inline-block"
+                      style={{ transform: showNames ? 'rotate(180deg)' : 'rotate(0deg)' }}>
+                      ▾
+                    </span>
+                  </button>
+                </div>
+              )}
             </div>
           </div>
 
-          {/* Collapsible names list */}
           {showNames && (
             <div className="px-3 pb-3">
               <div className="max-h-44 overflow-auto rounded-xl bg-white/5 p-2 grid grid-cols-2 gap-1.5">
@@ -349,12 +404,12 @@ export default function SpeechController({ navRef, lang = 'en-US' }) {
                   <button
                     key={name}
                     type="button"
-                    className="truncate text-left text-[12px] px-2 py-1 rounded-lg bg-white/10 hover:bg-white/20 active:bg-white/25 transition"
+                    className="truncate text-left text-[12px] px-2 py-1 rounded-lg bg-white/10 hover:bg白/20 active:bg-white/25 transition"
                     onClick={() => {
-                      // jump to the card when clicked
                       try {
                         navRef?.current?.showByIndex?.(i);
                       } catch {}
+                      lastShownIdx.current = i;
                       setShowNames(false);
                     }}
                     title={name}>
@@ -367,10 +422,15 @@ export default function SpeechController({ navRef, lang = 'en-US' }) {
         </div>
       </div>
 
-      {/* Bottom center: transcript (unchanged position) */}
+      {/* Transcript bubble (stays active under overlays) */}
       <div className="pointer-events-none fixed bottom-44 inset-x-0 flex justify-center z-[9998]">
-        <div className="min-w-[20vw] max-w-[20vw] font-bold rounded-2xl bg-black/70 backdrop-blur px-4 py-3 text-white text-sm shadow-lg">
-          <div>{finalText || "Say a card name, 'open link', or 'next' / 'back'…"}</div>
+        <div className="min-w-[22vw] max-w-[22vw] font-bold rounded-2xl bg-black/70 backdrop-blur px-4 py-3 text-white text-sm shadow-lg">
+          {showDeck === true ? (
+            <div>{finalText || 'Say the name of the card, open link, or next/back'}</div>
+          ) : (
+            <div>{finalText || 'Say “what’s my future" or click the button'}</div>
+          )}
+
           {interimText && <div className="mt-1 text-xs opacity-70">{interimText}</div>}
         </div>
       </div>

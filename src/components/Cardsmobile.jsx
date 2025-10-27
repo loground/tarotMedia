@@ -12,23 +12,30 @@ const BASE_SCALE = 35;
 const SLIDE_X = CARD_W * 0.5;
 const ease = (x) => (x <= 0 ? 0 : x >= 1 ? 1 : x * x * (3 - 2 * x));
 
-export function CardsMobile({ anchorRef: externalAnchorRef, zoomRef, navRef }) {
+export function CardsMobile({ anchorRef, zoomRef, navRef, onIndexChange, visible = true }) {
   const COUNT = 22;
   const urls = useMemo(
     () => Array.from({ length: COUNT }, (_, i) => `/tarot/tarot${i + 1}.jpg`),
     [COUNT],
   );
   return (
-    <MobileCarousel urls={urls} anchorRef={externalAnchorRef} zoomRef={zoomRef} navRef={navRef} />
+    <MobileCarousel
+      urls={urls}
+      anchorRef={anchorRef}
+      zoomRef={zoomRef}
+      navRef={navRef}
+      onIndexChange={onIndexChange}
+      visible={visible}
+    />
   );
 }
 
-function MobileCarousel({ urls, anchorRef: externalAnchorRef, zoomRef, navRef }) {
+function MobileCarousel({ urls, anchorRef, zoomRef, navRef, onIndexChange, visible }) {
   const internalAnchor = useRef();
-  const anchor = externalAnchorRef || internalAnchor;
+  const anchor = anchorRef || internalAnchor;
 
-  const meshA = useRef();
-  const meshB = useRef();
+  const meshA = useRef(null);
+  const meshB = useRef(null);
   const matsA = useRef(null);
   const matsB = useRef(null);
 
@@ -37,10 +44,11 @@ function MobileCarousel({ urls, anchorRef: externalAnchorRef, zoomRef, navRef })
   const readyRef = useRef(false);
   const anim = useRef({ playing: false, t: 0, dir: 0, dur: 0.3, setIndex: null });
 
+  // private TextureLoader (prevents global interference)
   const loaderRef = useRef(null);
   if (!loaderRef.current) {
-    const privateManager = new THREE.LoadingManager();
-    loaderRef.current = new THREE.TextureLoader(privateManager);
+    const mgr = new THREE.LoadingManager();
+    loaderRef.current = new THREE.TextureLoader(mgr);
   }
 
   const cache = useRef(new Map());
@@ -109,6 +117,7 @@ function MobileCarousel({ urls, anchorRef: externalAnchorRef, zoomRef, navRef })
     }),
   ];
 
+  // Initial setup (materials + first/neighbor textures)
   useEffect(() => {
     let live = true;
     (async () => {
@@ -150,13 +159,29 @@ function MobileCarousel({ urls, anchorRef: externalAnchorRef, zoomRef, navRef })
       loadTexture(next);
 
       readyRef.current = true;
+
+      // Background preload (throttled) to avoid jank/webcam freeze
+      let i = 2;
+      const tick = () => {
+        if (!live) return;
+        if (i >= urls.length) return;
+        const url = urls[i++];
+        loadTexture(url).finally(() => setTimeout(tick, 50));
+      };
+      setTimeout(tick, 100);
     })();
     return () => {
       live = false;
     };
   }, [urls, loadTexture]);
 
-  // existing next/prev
+  const notifyIndexChange = useCallback(
+    (idx) => {
+      if (typeof onIndexChange === 'function') onIndexChange(idx);
+    },
+    [onIndexChange],
+  );
+
   const go = useCallback(
     async (dir) => {
       if (!readyRef.current || anim.current.playing) return;
@@ -172,7 +197,7 @@ function MobileCarousel({ urls, anchorRef: externalAnchorRef, zoomRef, navRef })
       incomingMesh.position.x = dir * SLIDE_X;
       outgoingMesh.position.x = 0;
 
-      anim.current = { playing: true, t: 0, dir, dur: 0.3, setIndex: null };
+      anim.current = { playing: true, t: 0, dir, dur: 0.25, setIndex: null };
 
       const after = (nextIdx + 1) % urls.length;
       const before = (nextIdx - 1 + urls.length) % urls.length;
@@ -182,17 +207,15 @@ function MobileCarousel({ urls, anchorRef: externalAnchorRef, zoomRef, navRef })
     [loadTexture, urls],
   );
 
-  // NEW: jump straight to any index with one slide anim
   const showIndex = useCallback(
     async (targetIdx, dirOverride) => {
       if (!readyRef.current || anim.current.playing) return;
-      let tIdx = ((targetIdx % urls.length) + urls.length) % urls.length;
+      const tIdx = ((targetIdx % urls.length) + urls.length) % urls.length;
       if (tIdx === indexRef.current) return;
 
-      // choose direction: shortest way around the ring unless overridden
-      const forwardSteps = (tIdx - indexRef.current + urls.length) % urls.length;
-      const backwardSteps = urls.length - forwardSteps;
-      const dir = dirOverride ?? (forwardSteps <= backwardSteps ? 1 : -1);
+      const forward = (tIdx - indexRef.current + urls.length) % urls.length;
+      const backward = urls.length - forward;
+      const dir = dirOverride ?? (forward <= backward ? 1 : -1);
 
       const tex = cache.current.get(urls[tIdx]) || (await loadTexture(urls[tIdx]));
 
@@ -205,7 +228,7 @@ function MobileCarousel({ urls, anchorRef: externalAnchorRef, zoomRef, navRef })
       incomingMesh.position.x = dir * SLIDE_X;
       outgoingMesh.position.x = 0;
 
-      anim.current = { playing: true, t: 0, dir, dur: 0.3, setIndex: tIdx };
+      anim.current = { playing: true, t: 0, dir, dur: 0.28, setIndex: tIdx };
 
       const after = (tIdx + 1) % urls.length;
       const before = (tIdx - 1 + urls.length) % urls.length;
@@ -215,26 +238,66 @@ function MobileCarousel({ urls, anchorRef: externalAnchorRef, zoomRef, navRef })
     [loadTexture, urls],
   );
 
-  // expose controls to outside
+  const waitAnimEnd = useCallback(
+    () =>
+      new Promise((res) => {
+        const check = () => {
+          if (!anim.current.playing) return res();
+          requestAnimationFrame(check);
+        };
+        check();
+      }),
+    [],
+  );
+
+  // Public: spin several steps, then land on random index (returns final index)
+  const spinAndStopRandom = useCallback(
+    async ({ spins = 8, finalDelay = 0.28 } = {}) => {
+      if (!readyRef.current) return indexRef.current;
+
+      const bakDur = anim.current.dur;
+      anim.current.dur = 0.16;
+
+      for (let i = 0; i < Math.max(1, spins); i++) {
+        await go(1);
+        await waitAnimEnd();
+      }
+
+      let target = Math.floor(Math.random() * urls.length);
+      if (target === indexRef.current) target = (target + 1) % urls.length;
+
+      anim.current.dur = finalDelay;
+      await showIndex(target);
+      await waitAnimEnd();
+
+      anim.current.dur = bakDur;
+      return indexRef.current;
+    },
+    [go, showIndex, waitAnimEnd, urls.length],
+  );
+
+  // Expose controls to parent
   useEffect(() => {
     if (!navRef) return;
     navRef.current = {
       next: () => go(1),
       prev: () => go(-1),
       showByIndex: (i) => showIndex(i),
+      getActiveIndex: () => indexRef.current,
+      spinAndStopRandom,
     };
     return () => {
       if (navRef) navRef.current = null;
     };
-  }, [navRef, go, showIndex]);
+  }, [navRef, go, showIndex, spinAndStopRandom]);
 
+  // Animation frame: ONLY move & scale the anchor; DO NOT set rotation.* here.
   useFrame((state, dt) => {
     if (!readyRef.current) return;
 
     const t = state.clock.getElapsedTime() * 0.8;
     const offX = Math.cos(t * 0.9) * 0.12;
     const offY = Math.sin(t) * 0.18;
-    const rotZOff = Math.cos(t * 0.7) * 0.02;
     const s = 1 + Math.sin(t * 0.5) * 0.008;
 
     const a = anchor.current;
@@ -243,13 +306,12 @@ function MobileCarousel({ urls, anchorRef: externalAnchorRef, zoomRef, navRef })
       const zoom = zoomRef?.current ?? 1;
       a.position.x = THREE.MathUtils.lerp(a.position.x, offX, 1 - Math.exp(-K * dt));
       a.position.y = THREE.MathUtils.lerp(a.position.y, offY, 1 - Math.exp(-K * dt));
-      a.rotation.x = THREE.MathUtils.lerp(a.rotation.x, -0.09, 1 - Math.exp(-K * dt));
-      a.rotation.z = THREE.MathUtils.lerp(a.rotation.z, 0.04 + rotZOff, 1 - Math.exp(-K * dt));
       a.scale.x = THREE.MathUtils.lerp(a.scale.x, BASE_SCALE * s * zoom, 1 - Math.exp(-K * dt));
       a.scale.y = THREE.MathUtils.lerp(a.scale.y, BASE_SCALE * s * zoom, 1 - Math.exp(-K * dt));
       a.scale.z = 1;
     }
 
+    // Slide cross-fade
     const inMesh = (currentIsA.current ? meshB : meshA).current;
     const outMesh = (currentIsA.current ? meshA : meshB).current;
     const inMats = (currentIsA.current ? matsB : matsA).current;
@@ -271,11 +333,13 @@ function MobileCarousel({ urls, anchorRef: externalAnchorRef, zoomRef, navRef })
         anim.current.t = 0;
         currentIsA.current = !currentIsA.current;
 
-        // NEW: use explicit target index if provided
-        indexRef.current =
+        const newIdx =
           anim.current.setIndex != null
             ? anim.current.setIndex
             : (indexRef.current + dir + urls.length) % urls.length;
+
+        indexRef.current = newIdx;
+        notifyIndexChange(newIdx);
 
         const hiddenMesh = (currentIsA.current ? meshB : meshA).current;
         const hiddenMats = (currentIsA.current ? matsB : matsA).current;
@@ -286,7 +350,7 @@ function MobileCarousel({ urls, anchorRef: externalAnchorRef, zoomRef, navRef })
   });
 
   return (
-    <group ref={anchor}>
+    <group ref={anchor} visible={visible}>
       <mesh ref={meshA} position={[0, -2, 0]}>
         <boxGeometry args={[CARD_W, CARD_H, CARD_D]} />
         <group position={[0, 0, CARD_D / 2 + 0.2]}>
