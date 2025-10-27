@@ -44,6 +44,7 @@ const CARD_TITLES = [
   'sarto',
   'souljak',
   'god',
+  'final',
 ];
 
 // Per-card destination links (edit as you wish)
@@ -71,6 +72,7 @@ const CARD_LINKS = [
   'https://vibechain.com/market/historyofcomputer?ref=0HTIY11FVZDZ',
   'https://www.souljak.wtf/',
   'https://x.com/cryptojcdenton/status/1976835381904781649',
+  'https://x.com/jessepollak/status/1981752869146816767',
 ];
 
 // Strong patterns + alias fallbacks for noisy ASR
@@ -97,6 +99,7 @@ const CARD_PATTERNS = [
   { re: /\bsarto\b/i, idx: 19 },
   { re: /\bsouljak\b/i, idx: 20 },
   { re: /\bgod\b/i, idx: 21 },
+  { re: /\bfinal\b/i, idx: 22 },
 ];
 
 const CARD_ALIASES = {
@@ -424,7 +427,7 @@ export default function SpeechController({ navRef, lang = 'en-US', onAskFuture, 
 
       {/* Transcript bubble (stays active under overlays) */}
       <div className="pointer-events-none fixed bottom-44 inset-x-0 flex justify-center z-[9999999]">
-        <div className="min-w-[22vw] max-w-[22vw] font-bold rounded-2xl bg-black/70 backdrop-blur px-4 py-3 text-white text-sm shadow-lg">
+        <div className="min-w-[42vw] md:min-w-[22vw] md:max-w-[22vw] font-bold rounded-2xl bg-black/70 backdrop-blur px-4 py-3 text-white text-sm shadow-lg">
           {showDeck === true ? (
             <div>{finalText || 'Say the name of the card, open link, or next/back'}</div>
           ) : (

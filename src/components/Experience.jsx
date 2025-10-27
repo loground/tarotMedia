@@ -92,7 +92,7 @@ const FORTUNES = [
   ['I have no clue what to write here', 'Probably time to plant a tree or film something i dunno'],
   // 14
   [
-    'Be careful, your face might be redrawn into ass bu this guy',
+    'Be careful, your face might be redrawn into ass by this guy',
     'Bought $meme-park? Better buy some more',
     'You never gonna draw 100 arts as fast as this guy, sorry',
   ],
@@ -194,7 +194,7 @@ function waitForNav(navRef, timeoutMs = 3000) {
 }
 
 export const Experience = (props) => {
-  useIsMobile();
+  const isMobile = useIsMobile();
 
   const cardsAnchorRef = useRef();
   const zoomRef = useRef(1);
@@ -276,7 +276,10 @@ export const Experience = (props) => {
       {/* Initial CTA */}
       {!showDeck && (
         <Html>
-          <div className="fixed top-60 inset-0 flex items-center justify-center pointer-events-none">
+          <div
+            className={`fixed ${
+              isMobile ? 'top-32' : 'top-60'
+            } inset-0 flex items-center justify-center pointer-events-none`}>
             <button
               type="button"
               onClick={revealFuture}
@@ -291,7 +294,10 @@ export const Experience = (props) => {
       {/* Fortune panel */}
       {fortune && showDeck && (
         <Html>
-          <div className="fixed  right-40 z-[10] pointer-events-none">
+          <div
+            className={`fixed ${
+              isMobile ? 'left-20 top-20' : 'right-40'
+            } z-[10] pointer-events-none`}>
             <div className="pointer-events-auto max-w-[92vw] md:max-w-[420px] bg-black/75 text-white rounded-2xl backdrop-blur px-5 py-4 shadow-2xl ring-1 ring-white/10">
               <div className="text-xl font-de opacity-70 uppercase tracking-wide">Your future:</div>
               <ul className="mt-1 space-y-1 text-sm leading-snug">
