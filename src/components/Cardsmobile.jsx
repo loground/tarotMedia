@@ -34,6 +34,13 @@ function MobileCarousel({ urls, anchorRef, zoomRef, navRef, onIndexChange, visib
   const internalAnchor = useRef();
   const anchor = anchorRef || internalAnchor;
 
+  // A real "ready" barrier the parent can await
+  const readyPromiseRef = useRef(null);
+  const resolveReadyRef = useRef(null);
+  if (!readyPromiseRef.current) {
+    readyPromiseRef.current = new Promise((res) => (resolveReadyRef.current = res));
+  }
+
   const meshA = useRef(null);
   const meshB = useRef(null);
   const matsA = useRef(null);
@@ -155,10 +162,12 @@ function MobileCarousel({ urls, anchorRef, zoomRef, navRef, onIndexChange, visib
 
       const prev = urls[(indexRef.current - 1 + urls.length) % urls.length];
       const next = urls[(indexRef.current + 1) % urls.length];
-      loadTexture(prev);
-      loadTexture(next);
+
+      // ensure neighbors are loaded before declaring ready
+      await Promise.all([loadTexture(prev), loadTexture(next)]);
 
       readyRef.current = true;
+      resolveReadyRef.current?.(); // ✅ truly ready now
 
       // Background preload (throttled) to avoid jank/webcam freeze
       let i = 2;
@@ -285,11 +294,22 @@ function MobileCarousel({ urls, anchorRef, zoomRef, navRef, onIndexChange, visib
       showByIndex: (i) => showIndex(i),
       getActiveIndex: () => indexRef.current,
       spinAndStopRandom,
+      // new: allow parent to await internal readiness
+      ensureReady: () => readyPromiseRef.current,
+      // new: prewarm N forward frames for a fast spin
+      prewarmSpin: async (spins = 8) => {
+        const tasks = [];
+        for (let i = 1; i <= spins + 3; i++) {
+          const idx = (indexRef.current + i + urls.length) % urls.length;
+          tasks.push(loadTexture(urls[idx]));
+        }
+        await Promise.all(tasks);
+      },
     };
     return () => {
       if (navRef) navRef.current = null;
     };
-  }, [navRef, go, showIndex, spinAndStopRandom]);
+  }, [navRef, go, showIndex, spinAndStopRandom, urls, loadTexture]);
 
   // Animation frame: ONLY move & scale the anchor; DO NOT set rotation.* here.
   useFrame((state, dt) => {
@@ -339,7 +359,7 @@ function MobileCarousel({ urls, anchorRef, zoomRef, navRef, onIndexChange, visib
             : (indexRef.current + dir + urls.length) % urls.length;
 
         indexRef.current = newIdx;
-        notifyIndexChange(newIdx);
+        if (typeof onIndexChange === 'function') notifyIndexChange(newIdx);
 
         const hiddenMesh = (currentIsA.current ? meshB : meshA).current;
         const hiddenMats = (currentIsA.current ? matsB : matsA).current;

@@ -221,6 +221,9 @@ export const Experience = (props) => {
     setDeckVisible(true);
     await new Promise(requestAnimationFrame);
 
+    await navRef.current?.ensureReady?.();
+    await navRef.current?.prewarmSpin?.(10);
+
     const finalIndex =
       (await navRef.current?.spinAndStopRandom?.({ spins: 10, finalDelay: 0.28 })) ?? 0;
 
