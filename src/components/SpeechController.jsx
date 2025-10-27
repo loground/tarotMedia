@@ -399,12 +399,12 @@ export default function SpeechController({ navRef, lang = 'en-US', onAskFuture, 
 
           {showNames && (
             <div className="px-3 pb-3">
-              <div className="max-h-44 overflow-auto rounded-xl bg-white/5 p-2 grid grid-cols-2 gap-1.5">
+              <div className="max-h-44 overflow-auto rounded-xl bg-white/5 p-2 grid grid-cols-2 gap-1.5 z-[10000]">
                 {CARD_TITLES.map((name, i) => (
                   <button
                     key={name}
                     type="button"
-                    className="truncate text-left text-[12px] px-2 py-1 rounded-lg bg-white/10 hover:bg白/20 active:bg-white/25 transition"
+                    className="truncate text-left text-[12px] px-2 py-1 rounded-lg bg-white/10 hover:bg-white/20 active:bg-white/25 transition"
                     onClick={() => {
                       try {
                         navRef?.current?.showByIndex?.(i);
@@ -423,7 +423,7 @@ export default function SpeechController({ navRef, lang = 'en-US', onAskFuture, 
       </div>
 
       {/* Transcript bubble (stays active under overlays) */}
-      <div className="pointer-events-none fixed bottom-44 inset-x-0 flex justify-center z-[9998]">
+      <div className="pointer-events-none fixed bottom-44 inset-x-0 flex justify-center z-[9999999]">
         <div className="min-w-[22vw] max-w-[22vw] font-bold rounded-2xl bg-black/70 backdrop-blur px-4 py-3 text-white text-sm shadow-lg">
           {showDeck === true ? (
             <div>{finalText || 'Say the name of the card, open link, or next/back'}</div>

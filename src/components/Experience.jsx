@@ -2,7 +2,7 @@
 import { Environment, useTexture, Html } from '@react-three/drei';
 import * as THREE from 'three';
 import { useThree } from '@react-three/fiber';
-import { useRef, useState, useCallback } from 'react';
+import { useRef, useState, useCallback, useEffect } from 'react';
 
 import { CardsMobile } from './Cardsmobile';
 import WebcamSky from './WebcamBg';
@@ -16,44 +16,145 @@ function useIsMobile() {
   return size.width <= MOBILE_BP;
 }
 
-// 22 fortune buckets (use your full list)
+// Predictions per card — any length per bucket is fine.
 const FORTUNES = [
+  // 0
   [
-    'Base gas stays cheap — deployers prosper.',
-    'Next pump looks like a bug, then a feature.',
-    'Degen entry now, cope later.',
+    'Gotta get rich with bankr',
+    'x402 gotta pump your bags',
+    'Pick up one ok, computer, this is what you need at the moment',
   ],
-  ['Your bags become memes; your memes become culture.', 'NFA, but LFG soon™.', 'WGMI vibes.'],
-  ['Anons bless your entries; exit liquidity arrives late.', 'Green candles attract haters.'],
-  ['PEPE flips your boredom.', 'Frogs croak: “check Dexscreener.”', 'Ribbit = limit.'],
-  ['Hold the line.', 'The top wasn’t top — just the pre-top.', 'Diamond hands prevail.'],
-  ['STONKS ↗ after max pain.', 'Macro shrugs; your micro pumps.'],
-  ['Bank runs? Not your chain.', 'APY appears when you stop looking.', 'Bot snipes your snipe.'],
-  ['Jungle beats bear — again.', 'Primates trade better at night.', 'Banana RSI overbought.'],
-  ['DRB curls like a smile.', 'Hidden bid walls protect your heart.'],
-  ['Corn forks; your seed phrase doesn’t.', 'Vibes > whitepaper this week.'],
-  ['Dickbutt marks the pico-bottom.', 'If it feels dumb, re-check liquidity.'],
-  ['Mfers mf — then moon.', 'Low cap, high cope, rare win incoming.'],
-  ['Base turns bullish.', 'Bridge once, flex twice.'],
-  ['Film a tree; chart turns green.', 'Narratives rotate — stay nimble.'],
-  ['Ink dries on your 10x.', 'Contract reads you back: “gm.”'],
-  ['Melted charts reforge stronger.', 'Heat maps hide your alpha.'],
+  // 1
+  [
+    'About to make your first million on vibe market',
+    'dm nico and ask how to become a vibellionaire',
+    'open a few packs, it is your day today',
+  ],
+  // 2
+  [
+    'Better go code something today',
+    'Go crazy about stuff you create, when creating something, or stop creating',
+    'Have some rest, there should be those days',
+  ],
+  // 3
+  [
+    'Check your portfolio, you might made some money',
+    'Go touch some grass”',
+    'Have a deeper look at base memes that pumping',
+  ],
+  // 4
+  [
+    'Watch what jesse buys, it might be your next win',
+    'Reply to next jesses post, its something you need',
+    'Base is a good place to start if you havent yet',
+  ],
+  // 5
+  [
+    'Will catch a good moment to take profits',
+    'About to have some good trading decisions',
+    'Even if you do nothing, it might pump anyways, just catch the right moment',
+  ],
+  // 6
+  [
+    'Claim your rewards, always check what you have',
+    'make it to top-100 leaderboard of bankr, its gonna worth it ',
+    '$bankr is where you gonna make some real profits this year',
+  ],
+  // 7
+  [
+    'It is always good time to get a new ape',
+    'Apes better trading at night',
+    'Sell some bananas, buy some $JBM',
+  ],
+  // 8
+  [
+    'Just smile, it is your day',
+    'might get rich as grok, who knows?',
+    'if token went down today - better pick some up, DRB time is coming',
+  ],
+  // 9
+  [
+    'Send some memes to birt, make his day',
+    'Tell yourself you love YOU',
+    'next 1000 packs will bring you hella money',
+  ],
+  // 10
+  ['Buy some dickbutt', '1 dick = 1 butt', 'Green liquidity flows into your dick or butt '],
+  // 11
+  ['Do what you want', 'Maybe it is time to buy another mfer?', '$mfer token is the answer'],
+  // 12
+  [
+    'Post on base app, it might fly',
+    'Use more base, airdrop will be huge',
+    'follow loground on base app',
+  ],
+  // 13
+  ['I have no clue what to write here', 'Probably time to plant a tree or film something i dunno'],
+  // 14
+  [
+    'Be careful, your face might be redrawn into ass bu this guy',
+    'Bought $meme-park? Better buy some more',
+    'You never gonna draw 100 arts as fast as this guy, sorry',
+  ],
+  // 15
+  [
+    'Whoops, the chart of your token just got destroyed',
+    'Listen to next KOL call, it is lifechanging (joking)',
+  ],
+  // 16
   ['Seacasa season approaches.', 'Liquidity naps, then sprints.'],
+  // 17
   ['Filthy gains need clean risk.', 'Charts align with your playlist.'],
+  // 18
   ['Johnny cashes; shorts dash.', 'Music to your PnL.'],
+  // 19
   ['Sarto stitches perfect entries.', 'Thread by thread, stack by stack.'],
+  // 20
   ['Souljak vibes protect entries.', 'Onchain whispers your name.'],
+  // 21
   ['God-tier patience → god-tier exit.', 'Devil candles test your faith.'],
 ];
 
-function pickFortunes(list, n = 3) {
-  if (!list?.length) return [];
-  const pool = [...list];
-  const out = [];
-  while (out.length < Math.min(n, pool.length)) {
-    out.push(pool.splice(Math.floor(Math.random() * pool.length), 1)[0]);
+/** Non-repeating picker per card.
+ * Shows every prediction once in random order, then reshuffles and repeats.
+ */
+function createNonRepeatingPicker() {
+  // Map<cardIndex, { order:number[]; ptr:number }>
+  const state = new Map();
+
+  function ensure(cardIdx) {
+    if (!state.has(cardIdx)) {
+      const n = Array.isArray(FORTUNES[cardIdx]) ? FORTUNES[cardIdx].length : 0;
+      const order = [...Array(n).keys()];
+      // shuffle
+      for (let i = order.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [order[i], order[j]] = [order[j], order[i]];
+      }
+      state.set(cardIdx, { order, ptr: 0 });
+    }
+    return state.get(cardIdx);
   }
-  return out;
+
+  return function pick(cardIdx) {
+    const list = FORTUNES[cardIdx] || [];
+    if (list.length === 0) return null;
+
+    const s = ensure(cardIdx);
+    if (s.ptr >= s.order.length) {
+      // reshuffle for a fresh cycle
+      const n = list.length;
+      s.order = [...Array(n).keys()];
+      for (let i = n - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [s.order[i], s.order[j]] = [s.order[j], s.order[i]];
+      }
+      s.ptr = 0;
+    }
+
+    const idxInList = s.order[s.ptr++];
+    return list[idxInList] ?? null;
+  };
 }
 
 function waitForNav(navRef, timeoutMs = 3000) {
@@ -80,25 +181,31 @@ export const Experience = (props) => {
 
   const video = useWebcam();
 
-  const [showDeck, setShowDeck] = useState(false); // mount CardsMobile/Hands
-  const [deckVisible, setDeckVisible] = useState(false); // actually visible (for first spin)
-  const [fortune, setFortune] = useState(null); // { index, lines }
+  const [showDeck, setShowDeck] = useState(false);
+  const [deckVisible, setDeckVisible] = useState(false);
+  // fortune now holds ONE line
+  const [fortune, setFortune] = useState(null); // { index: number, line: string }
 
-  // Show deck, wait for nav, paint one frame, spin to random, show fortune
+  // create one picker instance for the session
+  const pickerRef = useRef(null);
+  if (!pickerRef.current) pickerRef.current = createNonRepeatingPicker();
+  const pickOne = pickerRef.current;
+
+  // Show deck, spin, and show a single non-repeating prediction
   const revealFuture = useCallback(async () => {
     if (!showDeck) setShowDeck(true);
 
     await waitForNav(navRef);
 
     setDeckVisible(true);
-    await new Promise(requestAnimationFrame); // let it render once before the spin
+    await new Promise(requestAnimationFrame);
 
     const finalIndex =
       (await navRef.current?.spinAndStopRandom?.({ spins: 10, finalDelay: 0.28 })) ?? 0;
 
-    const lines = pickFortunes(FORTUNES[finalIndex], 3);
-    setFortune({ index: finalIndex, lines });
-  }, [showDeck]);
+    const line = pickOne(finalIndex);
+    setFortune(line ? { index: finalIndex, line } : null);
+  }, [showDeck, pickOne]);
 
   // Hide fortune when leaving that card
   const handleIndexChange = useCallback(
@@ -126,7 +233,6 @@ export const Experience = (props) => {
             visible={deckVisible}
           />
 
-          {/* Hands own rotation completely */}
           {video && (
             <HandRotateController
               video={video}
@@ -138,7 +244,7 @@ export const Experience = (props) => {
         </>
       )}
 
-      {/* Voice: “what’s my future” calls the exact same path */}
+      {/* Voice: “what’s my future” -> same path */}
       <SpeechController
         navRef={navRef}
         lang="en-US"
@@ -148,7 +254,7 @@ export const Experience = (props) => {
 
       {/* Initial CTA */}
       {!showDeck && (
-        <Html fullscreen>
+        <Html>
           <div className="fixed top-60 inset-0 flex items-center justify-center pointer-events-none">
             <button
               type="button"
@@ -163,14 +269,12 @@ export const Experience = (props) => {
 
       {/* Fortune panel */}
       {fortune && showDeck && (
-        <Html fullscreen>
-          <div className="absolute top-10 right-20 z-[9] pointer-events-none">
+        <Html>
+          <div className="fixed top-20 right-40 z-[10] pointer-events-none">
             <div className="pointer-events-auto max-w-[92vw] md:max-w-[420px] bg-black/75 text-white rounded-2xl backdrop-blur px-5 py-4 shadow-2xl ring-1 ring-white/10">
-              <div className="text-xs opacity-70 uppercase tracking-wide">Fortune prediction</div>
+              <div className="text-xl font-de opacity-70 uppercase tracking-wide">Your future:</div>
               <ul className="mt-1 space-y-1 text-sm leading-snug">
-                {fortune.lines.map((l, i) => (
-                  <li key={i}>• {l}</li>
-                ))}
+                <li>• {fortune.line}</li>
               </ul>
               <div className="mt-2 text-[11px] opacity-60">Switch cards to hide this fortune.</div>
             </div>
