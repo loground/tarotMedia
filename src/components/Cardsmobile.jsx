@@ -13,7 +13,7 @@ const SLIDE_X = CARD_W * 0.5;
 const ease = (x) => (x <= 0 ? 0 : x >= 1 ? 1 : x * x * (3 - 2 * x));
 
 export function CardsMobile({ anchorRef, zoomRef, navRef, onIndexChange, visible = true }) {
-  const COUNT = 22;
+  const COUNT = 23;
   const urls = useMemo(
     () => Array.from({ length: COUNT }, (_, i) => `/tarot/tarot${i + 1}.jpg`),
     [COUNT],

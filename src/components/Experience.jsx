@@ -102,17 +102,38 @@ const FORTUNES = [
     'Listen to next KOL call, it is lifechanging (joking)',
   ],
   // 16
-  ['Seacasa season approaches.', 'Liquidity naps, then sprints.'],
+  [
+    'Brick by brick, you gonna make it',
+    'You about to win next subscribers giveaway',
+    'Just hold to whatever you got, you gonna make it',
+  ],
   // 17
-  ['Filthy gains need clean risk.', 'Charts align with your playlist.'],
+  [
+    'Send filthy a pic of your feet dm and see where it gets you',
+    'You gotta turn green (like your skin and you wallet)',
+    'Grow your hair, why dont you?',
+  ],
   // 18
-  ['Johnny cashes; shorts dash.', 'Music to your PnL.'],
+  ['You need a new crocs', 'Order some new jibbits'],
   // 19
-  ['Sarto stitches perfect entries.', 'Thread by thread, stack by stack.'],
+  [
+    'Study something new, you never know where it takes you',
+    'You need more ok, computers',
+    'Color your hair to purple, it will change everything',
+  ],
   // 20
-  ['Souljak vibes protect entries.', 'Onchain whispers your name.'],
+  ['Say something good to your haters, they are not ready for it', 'Rip one souljak, it is time'],
   // 21
-  ['God-tier patience → god-tier exit.', 'Devil candles test your faith.'],
+  [
+    'Something or someone gotta take you to next level, just stay patient',
+    'Share what you think with everyone, you might be the one who change the game',
+    'Lmao wtf should I write here',
+  ],
+  [
+    'You the GOAT and you should know that',
+    'Build something and tag Jesse',
+    'Vibe market might change everything for you',
+  ],
 ];
 
 /** Non-repeating picker per card.
@@ -270,7 +291,7 @@ export const Experience = (props) => {
       {/* Fortune panel */}
       {fortune && showDeck && (
         <Html>
-          <div className="fixed top-20 right-40 z-[10] pointer-events-none">
+          <div className="fixed  right-40 z-[10] pointer-events-none">
             <div className="pointer-events-auto max-w-[92vw] md:max-w-[420px] bg-black/75 text-white rounded-2xl backdrop-blur px-5 py-4 shadow-2xl ring-1 ring-white/10">
               <div className="text-xl font-de opacity-70 uppercase tracking-wide">Your future:</div>
               <ul className="mt-1 space-y-1 text-sm leading-snug">
